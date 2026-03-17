@@ -1012,7 +1012,14 @@ void DEV9write16(u32 addr, u16 value)
 	}
 
 	dev9Ru16(addr) = value;
-	Console.Error("DEV9: *Unknown 16bit write at address %lx value %x", addr, value);
+	/**
+	 * isra: ACFLASH module writes the following sequence to this specific address: 
+	 * [0x00ff, 0x0090, 0x0090, 0x00ff] // Intel 28F640J5  probe
+	 * [0xaaaa, 0x5555, 0x9090, 0xf0f0] // Fujitsu 29F033C probe
+	 * SILENCE!
+	 * */
+	if (addr != 0x10000000) 
+		Console.Error("DEV9: *Unknown 16bit write at address %lx value %x", addr, value);
 	return;
 }
 
