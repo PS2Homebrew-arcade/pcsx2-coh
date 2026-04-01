@@ -14,6 +14,7 @@
 #define ACATA_DEVCNT             2 // ammount of ATA devices probed by ACATA.IRX
 
 #include "ACATA_internal.h"
+#include "ACATAPI.h"
 
 #define ACATA_PROBEREG_0         0x16020000
 #define ACATA_PROBEREG_1         0x16030000
@@ -44,6 +45,7 @@ namespace ACATA
     extern u32 last_write;
     extern u32 cmd_handled;
     extern u32 cmd_handledc;
+    extern atapi_packet_t ata_c_packet;
 
     u16 read16(u32 addr);               // handle writes to ACATA MMIO
     void write16(u32 addr, u16 val);    // handle reads  to ACATA MMIO

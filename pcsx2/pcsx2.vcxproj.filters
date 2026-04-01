@@ -878,6 +878,9 @@
     <ClCompile Include="DEV9\ACATA.cpp">
       <Filter>System\Ps2\ACMMIO</Filter>
     </ClCompile>
+    <ClCompile Include="DEV9\ACATAPI.cpp">
+      <Filter>System\Ps2\ACMMIO</Filter>
+    </ClCompile>
     <ClCompile Include="DEV9\flash.cpp">
       <Filter>System\Ps2\DEV9</Filter>
     </ClCompile>

@@ -322,6 +322,7 @@ set(pcsx2DEV9Sources
 	DEV9/ACRAM.cpp
 	DEV9/ACSRAM.cpp
 	DEV9/ACATA.cpp
+	DEV9/ACATAPI.cpp
 	)
 
 # DEV9 headers

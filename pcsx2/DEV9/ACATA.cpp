@@ -27,7 +27,7 @@ u16 ACATA::read16(u32 addr) {
     case ACATA_DEVICE_SELECT:
     break;
     case ACATA_R_STATUS:
-        if (ACATA::last_write == ACATA_R_STATUS && ACATA::last_device_probed == ACATA_UNIT0) {
+        if (ACATA::last_write == ACATA_R_STATUS && ACATA::cmd_handled == 0 && ACATA::last_device_probed == ACATA_UNIT0) {
             // reading R_STATUS after writing zero to it? this is the ACATA probe. we have to respond BUSY at least once for the driver to keep going
             // FIXME
             if (ACATA::REGS[ACATA_R_STATUS] & ATA_STAT_BUSY)
@@ -58,11 +58,16 @@ void ACATA::write16(u32 addr, u16 val) {
     break;
     case ACATA_R_STATUS:
         ACATA::rstat_write_handle(val);
+        return; // dont store this value, w:ata command | r:ata status
         break;
     case ACATA_DEVICE_SELECT:
         ACATA::last_device_probed = ((V & ACATA_UNIT1) != 0); // ACATA: 0x0: unit 0 | 0x10: unit 1
         break;
     
+    case ACATA_BASE_PROBEADDR:
+        ACATA::cmd_handleW(addr, val);
+    break;
+
     default:
         break;
     }
@@ -71,23 +76,28 @@ void ACATA::write16(u32 addr, u16 val) {
 
 u32 ACATA::cmd_handled;
 u32 ACATA::cmd_handledc;
+atapi_packet_t ACATA::ata_c_packet;
 
-u16 ACATA::cmd_handleW(u32 addr, u16 val) {
-    switch (ACATA::cmd_handled)
-    {
+void ACATA::cmd_handleW(u32 addr, u16 val) {
+    switch (ACATA::cmd_handled) {
     case ATA_C_PACKET:
-        Console.Error("ACATA:ATA_C_PACKET:W %04X", val);
+        if (ACATA::cmd_handledc < 6) { // packet is followed by a 6 word PIO
+            ACATA::ata_c_packet.raw[ACATA::cmd_handledc++] = val;
+            if (ACATA::cmd_handledc == 6) {
+                ACATAPI::handle_cmd(ACATA::ata_c_packet);
+                CLRB(ACATA::REGS[ACATA_R_STATUS], ATA_STAT_DRQ); // keep up DRQ only while the packet comes in?
+            }
+        }
         break;
     
     default:
-        Console.Error("ACATA: writing from %X while no pending CMD", ACATA_BASE_PROBEADDR);
+        Console.Error("ACATA: writing from %X while no pending CMD", addr);
         break;
     }
 }
 
 u16 ACATA::cmd_handleR(u32 addr) {
-    switch (ACATA::cmd_handled)
-    {
+    switch (ACATA::cmd_handled) {
     case -1: break;
     case ATA_C_IDENTIFY_PACKET_DEVICE: //ATA_C_IDENTIFY_PACKET_DEVICE
         if (ACATA::cmd_handledc < 256) {
@@ -107,20 +117,23 @@ u16 ACATA::cmd_handleR(u32 addr) {
 }
 
 void ACATA::rstat_write_handle(u16 val) {
-    switch (val)
-    {
-    case 0:
+    switch (val) {
+    case ATA_C_NOP:
+        ACATA::cmd_handled = val;
         // the only situation when we will recieve a 0 (twice) to this reg, is during ACATA init.
         // here, the ata busy flag must be present at least once, on the following checks to this addr
         break;
     case ATA_C_IDENTIFY_PACKET_DEVICE:
+        Console.Warning("ATA_C_IDENTIFY_PACKET_DEVICE");
         ACATA::cmd_handled = val;
         ACATA::cmd_handledc = 0;
     break;
     case ATA_C_PACKET:
         ACATA::cmd_handled = val;
-        Console.Warning("ATA_C_PACKET:", U32FU16(ACATA::REGS[ACATA_16050000], ACATA::REGS[ACATA_16040000]));
+        ACATA::cmd_handledc = 0;
+        Console.Warning("ATA_C_PACKET");
         ACATA::REGS[ACATA_R_STATUS] |= ATA_STAT_DRQ;
+        CLRB(ACATA::REGS[ACATA_R_STATUS], ATA_STAT_BUSY);
     break;
     
     
@@ -131,7 +144,7 @@ void ACATA::rstat_write_handle(u16 val) {
 }
 
 std::map<u32, u32> ACATA::REGS = {
-    {ACATA_BASE_PROBEADDR, 0x8500},
+    {ACATA_BASE_PROBEADDR, 0},
     {ACATA_PROBEREG_0,     0},
     {ACATA_PROBEREG_1,     0},
     {ACATA_PROBEREG_2,     0},
