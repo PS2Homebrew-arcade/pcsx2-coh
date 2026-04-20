@@ -61,6 +61,7 @@
 #include "discord_rpc.h"
 #include "fmt/format.h"
 
+
 #include <atomic>
 #include <mutex>
 #include <sstream>
@@ -77,6 +78,11 @@
 #ifdef __APPLE__
 #include "common/Darwin/DarwinMisc.h"
 #endif
+
+#include "common/YAML.h"
+#include "common/ARCADE.h"
+
+#include "DEV9/ACATA.h"
 
 namespace VMManager
 {
@@ -1263,6 +1269,32 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 			s_elf_override = filename;
 			return true;
 		}
+		else if (isArcadeManifest(filename))
+		{
+			CDVDsys_ChangeSource(CDVD_SourceType::NoDisc); // COH-H does not have a laser like retails
+			INISettingsInterface INI(filename);
+			if (!INI.Load()){
+				Console.Error("cannot read arcade game config '%s'", filename.c_str());
+				return false;
+			} else {
+				std::string basedir = Path::ToNativePath(Path::GetDirectory(filename));
+				Console.WriteLnFmt("basedir:'{}'", basedir);
+				std::string s_acmedia, s_imgname;
+				Console.WriteLn("# ARCADE GAME CONFIG FILE DETECTED");
+				s_acmedia = INI.GetStringValue("data", "media");
+				s_imgname = INI.GetStringValue("data", "mediasrc");
+
+				s_elf_override = Path::Combine(basedir, INI.GetStringValue("game", "elf"));
+				ACATA::SetEnv(basedir, s_imgname, s_acmedia);
+				int R;
+				if ((R = ACATA::TH::IO_OpenImage())!=0) {
+					Error::SetString(error, std::string("cannot open arcade media image"));
+					return false;
+				}
+				
+				return true;
+			}
+		}
 		else
 		{
 			// TODO: Maybe we should check if it's a valid iso here...
@@ -1478,6 +1510,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 		}
 
 		Hle_SetHostRoot(s_elf_override.c_str());
+		ACATA::SetImgPath(s_elf_override.c_str());
 	}
 	else if (CDVDsys_GetSourceType() == CDVD_SourceType::Iso)
 	{
@@ -2401,6 +2434,11 @@ bool VMManager::IsElfFileName(const std::string_view path)
 	return StringUtil::EndsWithNoCase(path, ".elf");
 }
 
+bool VMManager::isArcadeManifest(const std::string_view path)
+{
+	return StringUtil::EndsWithNoCase(path, ".acgame");
+}
+
 bool VMManager::IsBlockDumpFileName(const std::string_view path)
 {
 	return StringUtil::EndsWithNoCase(path, ".dump");
@@ -2432,7 +2470,7 @@ bool VMManager::IsDiscFileName(const std::string_view path)
 
 bool VMManager::IsLoadableFileName(const std::string_view path)
 {
-	return IsDiscFileName(path) || IsElfFileName(path) || IsGSDumpFileName(path) || IsBlockDumpFileName(path);
+	return IsDiscFileName(path) || IsElfFileName(path) || IsGSDumpFileName(path) || IsBlockDumpFileName(path) || isArcadeManifest(path);
 }
 
 #ifdef _WIN32

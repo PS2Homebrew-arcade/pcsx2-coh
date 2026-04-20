@@ -18,6 +18,7 @@
 #include "common/ProgressCallback.h"
 #include "common/ScopedGuard.h"
 #include "common/StringUtil.h"
+#include "common/ARCADE.h"
 
 #include <algorithm>
 #include <array>
@@ -60,6 +61,7 @@ namespace GameList
 	static bool GetIsoSerialAndCRC(const std::string& path, s32* disc_type, std::string* serial, u32* crc);
 	static Region ParseDatabaseRegion(const std::string_view db_region);
 	static bool GetElfListEntry(const std::string& path, GameList::Entry* entry);
+	static bool GetAcConfListEntry(const std::string& path, GameList::Entry* entry);
 	static bool GetIsoListEntry(const std::string& path, GameList::Entry* entry);
 
 	static bool GetGameListEntryFromCache(const std::string& path, GameList::Entry* entry);
@@ -226,7 +228,7 @@ const char* GameList::EntryCompatibilityRatingToString(CompatibilityRating ratin
 
 bool GameList::IsScannableFilename(const std::string_view path)
 {
-	return VMManager::IsDiscFileName(path) || VMManager::IsElfFileName(path);
+	return VMManager::IsDiscFileName(path) || VMManager::IsElfFileName(path) || VMManager::isArcadeManifest(path);
 }
 
 void GameList::FillBootParametersForEntry(VMBootParameters* params, const Entry* entry)
@@ -267,6 +269,35 @@ bool GameList::GetIsoSerialAndCRC(const std::string& path, s32* disc_type, std::
 	*disc_type = DoCDVDdetectDiskType();
 	cdvdGetDiscInfo(serial, nullptr, nullptr, crc, nullptr);
 	DoCDVDclose();
+	return true;
+}
+
+bool GameList::GetAcConfListEntry(const std::string& filename, GameList::Entry* entry)
+{
+		INISettingsInterface INI(filename);
+		if (!INI.Load()){
+			Console.Error("cannot read arcade game config '%s'", filename.c_str());
+			return false;
+		}
+		
+		std::string basedir = Path::ToNativePath(Path::GetDirectory(filename));
+		std::string s_acmedia, s_imgname;
+			
+			
+		entry->path = Path::Combine(basedir, INI.GetStringValue("game", "elf"));
+		entry->serial.clear();
+		entry->region = Region::Other;
+		entry->type = EntryType::ELF;
+		entry->compatibility_rating = CompatibilityRating::Unknown;
+		entry->crc = 0x00000000;
+		entry->total_size = 0;
+		entry->title = INI.GetStringValue("game", "name");
+		entry->serial = INI.GetStringValue("game", "gameid");
+		entry->arcade.cards[0] = INI.GetStringValue("data", "dongle");
+		entry->arcade.cards[1] = INI.GetStringValue("data", "card");
+		entry->arcade.mediapath = INI.GetStringValue("data", "mediasrc");
+		entry->arcade.MediaType = ACMEDIATYPE_FROM_STRING(INI.GetStringValue("data", "media"));
+
 	return true;
 }
 
@@ -439,6 +470,8 @@ bool GameList::PopulateEntryFromPath(const std::string& path, GameList::Entry* e
 {
 	if (VMManager::IsElfFileName(path.c_str()))
 		return GetElfListEntry(path, entry);
+	else if (VMManager::isArcadeManifest(path.c_str()))
+		return GetAcConfListEntry(path, entry);
 	else
 		return GetIsoListEntry(path, entry);
 }
