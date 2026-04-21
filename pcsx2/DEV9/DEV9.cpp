@@ -1062,16 +1062,17 @@ void DEV9write32(u32 addr, u32 value)
 
 void DEV9readDMA8Mem(u32* pMem, int size)
 {
-	if (!EmuConfig.DEV9.EthEnable && !EmuConfig.DEV9.HddEnable)
-		return;
+	//if (!EmuConfig.DEV9.EthEnable && !EmuConfig.DEV9.HddEnable)
+	//	return;
 
 	size >>= 1;
 
-	DevCon.WriteLn("DEV9: *DEV9readDMA8Mem: size %x", size);
-	if (ACATA::TH::PendTrasnfType != ACATA::TH::PTRNSF::NONE) {
+	DevCon.WriteLn("DEV9: *%s: size %x", __FUNCTION__, size);
+	//if (ACATA::TH::PendTrasnfType != ACATA::TH::PTRNSF::NONE) {
 		ACATA::TH::IO_Read(pMem, size);
+		psxDMA8Interrupt();
 		ACATA::TH::PendTrasnfType = ACATA::TH::PTRNSF::NONE;
-	}
+	//}
 
 #if 0 // TODO: purely for dealing with an "itch". castrate all retail DEV9 operations out of the emu when it's on a working state if possible
 	if (dev9.dma_ctrl & SPD_DMA_TO_SMAP)
