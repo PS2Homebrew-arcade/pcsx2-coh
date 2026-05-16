@@ -143,6 +143,10 @@ void ACATA::handle_cmd(u16 val) {
         CLRB(R_STATUS, ATA_STAT_BUSY);
         CLRB(R_STATUS_ALT, ATA_STAT_ERR); // when packet is sent, ACCDVD fails if this bit is set or timeout consumed
     break;
+    case ATA_C_SET_FEATURES:
+        Console.Warning("ATA_C_SET_FEATURES: FEATURE:%04X, R_NSECTOR:%04X, R_SECTOR:%04X, R_LCYL:%04X, R_HCYL:%04X",
+            R_FEATURE, R_NSECTOR, R_SECTOR, R_LCYL, R_HCYL);
+    break;
     
     
     default:
@@ -150,20 +154,6 @@ void ACATA::handle_cmd(u16 val) {
         break;
     }
 }
-
-
-u16 ACATA::R_DATA;
-u16 ACATA::R_FEATURE;
-u16 ACATA::R_ERROR;
-u16 ACATA::R_NSECTOR;
-u16 ACATA::R_SECTOR;
-u16 ACATA::R_LCYL;
-u16 ACATA::R_HCYL;
-u16 ACATA::R_SELECT;
-u16 ACATA::R_STATUS;
-u16 ACATA::R_COMMAND;
-u16 ACATA::R_STATUS_ALT;
-u16 ACATA::R_CONTROL;
 
 void ACATA_SETUP() {
     ACATA::TH::readBuffer = new u8[ACATA::TH::readBufferLen];
@@ -184,3 +174,17 @@ void ACATA::SetEnv(std::string ata_img_path, std::string ata_img_filename, std::
 	Console.WarningFmt("ACENV: ata_img: '{}'", ACATA::imgpath);
 	Console.WarningFmt("mediat: '{}'", (int)ACATA::MediaType);
 }
+
+
+u16 ACATA::R_DATA;
+u16 ACATA::R_FEATURE;
+u16 ACATA::R_ERROR;
+u16 ACATA::R_NSECTOR;
+u16 ACATA::R_SECTOR;
+u16 ACATA::R_LCYL;
+u16 ACATA::R_HCYL;
+u16 ACATA::R_SELECT;
+u16 ACATA::R_STATUS;
+u16 ACATA::R_COMMAND;
+u16 ACATA::R_STATUS_ALT;
+u16 ACATA::R_CONTROL;
