@@ -9,20 +9,24 @@
 #include "common/Pcsx2Types.h"
 #include "common/Pcsx2Defs.h"
 
+#define ATAPI_PKT_GETLBA(P) ((P.raw8[2] << 24) | (P.raw8[3] << 16) | (P.raw8[4] << 8) | (P.raw8[5]))
+#define ATAPI_PKT_GETLEN(P) ((P.raw8[7] << 8) | P.raw8[8])
 typedef union {
+    u8  raw8[12];
     u16 raw[6];
+    u32 raw32[3];
     struct {
         u8 opcode;
         u8 control0;
-        u16 lba_high;
-        u16 lba_lo;
+        u16 lba_high; // use ATAPI_PKT_GETLBA to get us
+        u16 lba_lo;   // use ATAPI_PKT_GETLBA to get us
         u8 resv;
-        u16 transf_len;
+        u16 transf_len; // use ATAPI_PKT_GETLEN to get me
         u8 control1;
         u8 control2;
         u8 unknown;
     }pkt;
-}atapi_packet_t;
+}atapi_packet_t; // helper for atapi packets
 
 namespace ACATAPI
 {
