@@ -49,7 +49,7 @@ u32 lastRead = 0x0;
 u16 ACJV::Read16(u32 addr) {
     if (addr >= ACJV_RDBASE && addr < 0x124045FE) {
         int x = (addr - ACJV_RDBASE)/2;
-		if (/*CurrentCMD == NONE &&*/ (x == 4 || x == 6 || x == 8)) return rdbuf.at(x)|1;// initial polling expects these addrs to not be zero
+		if (/*CurrentCMD == NONE &&*/ (x == 2 || x == 3 || x == 4)) return rdbuf.at(x)|1;// initial polling expects these addrs to not be zero
         return (u16)rdbuf.at(x);
     } else if ((addr == 0x124045FE)) {
 		return (u16)rdbuf.at((addr - ACJV_RDBASE)/2);
