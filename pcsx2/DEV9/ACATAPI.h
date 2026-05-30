@@ -31,8 +31,11 @@ typedef union {
 namespace ACATAPI
 {
     void handle_cmd(atapi_packet_t P);
-    u16 Read10(u32 lba, u16 tlen);
     void Setup(); // change ACATA stuff to handle CDROM instead of HDD
+    u16 pio_read_word();
+    bool has_pio_data();
+    void pio_write_word(u16 val);
+    bool has_pio_write();
 
     enum CONSTANTS {
         DVD_SECTORSIZE = 0x800,

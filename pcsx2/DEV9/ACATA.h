@@ -89,6 +89,7 @@ namespace ACATA
         void IO_Thread();
         void IO_Read();
         void IO_Read(u32* addr, u32 val); //alternate version to vomit data straight away to a ptr
+        void IO_Write(u32* addr, u32 size);
         int IO_OpenImage();
         int IO_CloseImage();
     }

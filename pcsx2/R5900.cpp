@@ -604,7 +604,7 @@ void eeloadHook()
 	int argc = cpuRegs.GPR.n.a0.SD[0];
 	if (argc) // calls to EELOAD *after* the first one during the startup process will come here
 	{
-#if 1 //DEBUG_LAUNCHARG
+#if DEBUG_LAUNCHARG
 		Console.WriteLn("eeloadHook: EELOAD was called with %d arguments according to $a0 and %d according to vargs block:",
 			argc, memRead32(cpuRegs.GPR.n.a1.UD[0] - 4));
 		for (int a = 0; a < argc; a++)
@@ -696,12 +696,14 @@ void eeloadHook()
 		if (!elfname.empty())
 		{
 			// Find and save location of default/fallback call "rom0:OSDSYS"; to be used later by eeloadHook2()
-			for (g_osdsys_str = EELOAD_START; g_osdsys_str < EELOAD_START + EELOAD_SIZE; g_osdsys_str += 8) // strings are 64-bit aligned
+			g_osdsys_str = 0;
+			for (u32 scan = EELOAD_START; scan < EELOAD_START + EELOAD_SIZE; scan += 8) // strings are 64-bit aligned
 			{
-				if (!strcmp((char*)PSM(g_osdsys_str), "rom0:OSDSYS"))
+				if (!strcmp((char*)PSM(scan), "rom0:OSDSYS"))
 				{
-					// Overwrite OSDSYS with game's ELF name
-					strcpy((char*)PSM(g_osdsys_str), elfname.c_str());
+					// Overwrite OSDSYS with game's ELF path; launch args are injected later by eeloadHook2()
+					strcpy((char*)PSM(scan), elfname.c_str());
+					g_osdsys_str = scan;
 				}
 			}
 		}

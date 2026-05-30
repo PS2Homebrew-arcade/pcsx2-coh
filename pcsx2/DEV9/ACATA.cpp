@@ -1,10 +1,56 @@
 #include "ACATA.h"
 #include "ACATAPI.h"
+#include "ACCORE.h"
 #include "common/Console.h"
 
 #include "ACMACROS.h"
 
+#include <sys/stat.h>
+#include <cstring>
+
 #include "ACATA_CMD_RESPONSES"
+
+static u8 ata_pio_buf[131072];
+static u32 ata_pio_len = 0;
+static u32 ata_pio_pos = 0;
+static u16 ata_identify_buf[256];
+
+static u32 ata_total_sectors = 0;
+
+static void ata_build_identify()
+{
+	memset(ata_identify_buf, 0, sizeof(ata_identify_buf));
+	ata_identify_buf[0] = 0x0040;
+	for (int i = 10; i <= 19; i++) ata_identify_buf[i] = 0x2020;
+	ata_identify_buf[23] = 0x312E; ata_identify_buf[24] = 0x3030;
+	ata_identify_buf[25] = 0x2020; ata_identify_buf[26] = 0x2020;
+	ata_identify_buf[27] = 0x4E41; ata_identify_buf[28] = 0x4D43;
+	ata_identify_buf[29] = 0x4F20; ata_identify_buf[30] = 0x4844;
+	ata_identify_buf[31] = 0x4420; ata_identify_buf[32] = 0x4452;
+	ata_identify_buf[33] = 0x4956; ata_identify_buf[34] = 0x4520;
+	for (int i = 35; i <= 46; i++) ata_identify_buf[i] = 0x2020;
+	ata_identify_buf[47] = 0x8010;
+	ata_identify_buf[49] = 0x0300;
+	ata_identify_buf[53] = 0x0007;
+	if (ACATA::TH::IMAGE) {
+		struct stat st;
+		if (fstat(fileno(ACATA::TH::IMAGE), &st) == 0 && st.st_size > 0) {
+			ata_total_sectors = (u32)(st.st_size / 512);
+			ata_identify_buf[60] = ata_total_sectors & 0xFFFF;
+			ata_identify_buf[61] = (ata_total_sectors >> 16) & 0xFFFF;
+		}
+	}
+	ata_identify_buf[63] = 0x0407;
+	ata_identify_buf[80] = 0x001E;
+	ata_identify_buf[82] = 0x0068;
+	ata_identify_buf[83] = 0x4000;
+	ata_identify_buf[84] = 0x4000;
+	ata_identify_buf[85] = 0x0068;
+	ata_identify_buf[86] = 0x0000;
+	ata_identify_buf[87] = 0x4000;
+	ata_identify_buf[88] = 0x001F;
+	ata_identify_buf[128] = 0x0001;
+}
 
 std::string ACATA::imgpath = "";
 ACMEDIATYPE ACATA::MediaType;
@@ -14,6 +60,7 @@ u32 ACATA::last_write = 0;
 u32 atacmd_responding = -1;
 u32 atacmd_response_traverse = 0;
 
+
 u16 ACATA::read16(u32 addr) {
     last_read = addr;
     switch (addr)
@@ -21,7 +68,6 @@ u16 ACATA::read16(u32 addr) {
     case ACATA_R_DATA:
         return ACATA::handle_dataR(addr);
     case ACATA_R_STATUS_ALT:
-        R_STATUS = 0;
         return R_STATUS;
     case ACATA_R_NSECTOR:
         return R_NSECTOR;
@@ -36,9 +82,9 @@ u16 ACATA::read16(u32 addr) {
     case ACATA_R_HCYL:
         return R_HCYL;
     case ACATA_R_STATUS:
+        // reading R_STATUS after writing zero to it? this is the ACATA probe. we have to respond BUSY at least once for the driver to keep going
+        // FIXME
         if (ACATA::last_write == ACATA_R_STATUS && ACATA::cmd_handled == 0 && ((R_SELECT & ACATA_UNIT1) == 0)) {
-            // reading R_STATUS after writing zero to it? this is the ACATA probe. we have to respond BUSY at least once for the driver to keep going
-            // FIXME
             if (R_STATUS & ATA_STAT_BUSY)
                 CLRB(R_STATUS, ATA_STAT_BUSY);
             else
@@ -53,20 +99,16 @@ u16 ACATA::read16(u32 addr) {
     return 0;
 }
 
-#define MMIO_RESPOND(V, O, N) if (V == O) V = N
-
-
 void ACATA::write16(u32 addr, u16 val) {
     last_write = addr;
-    u16 V = val;
     switch (addr) {
-    case ACATA_R_NSECTOR: R_NSECTOR = val; break;
-    case ACATA_R_SECTOR:  R_SECTOR  = val; break;
-    case ACATA_R_FEATURE: R_FEATURE = val; break;
-    case ACATA_R_CONTROL: R_CONTROL = val; break;
-    case ACATA_R_LCYL:    R_LCYL    = val; break;
-    case ACATA_R_HCYL:    R_HCYL    = val; break;
-    case ACATA_R_SELECT:  R_SELECT  = val; break;
+    case ACATA_R_NSECTOR: R_NSECTOR = val & 0xFF; break;
+    case ACATA_R_SECTOR:  R_SECTOR  = val & 0xFF; break;
+    case ACATA_R_FEATURE: R_FEATURE = val & 0xFF; break;
+    case ACATA_R_CONTROL: R_CONTROL = val & 0xFF; break;
+    case ACATA_R_LCYL:    R_LCYL    = val & 0xFF; break;
+    case ACATA_R_HCYL:    R_HCYL    = val & 0xFF; break;
+    case ACATA_R_SELECT:  R_SELECT  = val & 0xFF; break;
     case ACATA_R_COMMAND:
         // uyjulian says: "Yeah it should be masked and high byte is command type"
         ACATA::handle_cmd(val & 0xFF); return;
@@ -91,12 +133,14 @@ void ACATA::handle_dataW(u32 addr, u16 val) { // writes at R_DATA
         if (ACATA::cmd_handledc < 6) { // packet is followed by a 6 word PIO
             ACATA::ata_c_packet.raw[ACATA::cmd_handledc++] = val;
             if (ACATA::cmd_handledc == 6) {
-                ACATAPI::handle_cmd(ACATA::ata_c_packet);
                 CLRB(R_STATUS, ATA_STAT_DRQ); // keep up DRQ only while the packet comes in?
+                ACATAPI::handle_cmd(ACATA::ata_c_packet);
             }
+        } else if (ACATAPI::has_pio_write()) {
+            ACATAPI::pio_write_word(val);
         }
         break;
-    
+
     default:
         Console.Error("ACATA: writing from %X while no pending CMD", addr);
         break;
@@ -107,18 +151,61 @@ u16 ACATA::handle_dataR(u32 addr) { // PIO read at R_DATA
     switch (ACATA::cmd_handled) {
     case ATA_C_IDENTIFY_PACKET_DEVICE:
         if (ACATA::cmd_handledc < 256) {
-            return ATA_R_IDENTIFY_PACKET_DEVICE[ACATA::cmd_handledc++];
-        } else {ACATA::cmd_handled = -1; CLRB(R_STATUS, ATA_STAT_DRQ);}
+            u16 word = ATA_R_IDENTIFY_PACKET_DEVICE[ACATA::cmd_handledc++];
+            if (ACATA::cmd_handledc >= 256) {
+                ACATA::cmd_handled = -1;
+                CLRB(R_STATUS, ATA_STAT_DRQ);
+                R_STATUS |= ATA_STAT_READY;
+            }
+            return word;
+        }
         break;
     case ATA_C_IDENTIFY_DEVICE:
         if (ACATA::cmd_handledc < 256) {
-            return ATA_R_IDENTIFY_DEVICE[ACATA::cmd_handledc++];
-        } else {ACATA::cmd_handled = -1; CLRB(R_STATUS, ATA_STAT_DRQ);}
+            u16 word = ata_identify_buf[ACATA::cmd_handledc++];
+            if (ACATA::cmd_handledc >= 256) {
+                ACATA::cmd_handled = -1;
+                CLRB(R_STATUS, ATA_STAT_DRQ);
+                R_STATUS |= ATA_STAT_READY;
+                ACCORE::intr(ACCORE::INTRN_ATA);
+            }
+            return word;
+        }
+        break;
+    case ATA_C_READ_SECTOR:
+        if (ata_pio_pos * 2 < ata_pio_len) {
+            u32 off = ata_pio_pos * 2;
+            u16 val = ata_pio_buf[off] | ((u16)ata_pio_buf[off + 1] << 8);
+            ata_pio_pos++;
+            if (ata_pio_pos * 2 >= ata_pio_len) {
+                ACATA::cmd_handled = -1;
+                CLRB(R_STATUS, ATA_STAT_DRQ);
+                R_STATUS |= ATA_STAT_READY;
+                ACCORE::intr(ACCORE::INTRN_ATA);
+            }
+            return val;
+        }
         break;
     case ATA_C_SET_FEATURES:
     break;
+    case ATA_C_SCE_SECURITY_CONTROL:
+        if (ACATA::cmd_handledc < 256) {
+            u32 off = ACATA::cmd_handledc * 2;
+            u16 word = ata_pio_buf[off] | ((u16)ata_pio_buf[off + 1] << 8);
+            ACATA::cmd_handledc++;
+            if (ACATA::cmd_handledc >= 256) {
+                ACATA::cmd_handled = -1;
+                CLRB(R_STATUS, ATA_STAT_DRQ);
+                R_STATUS |= ATA_STAT_READY;
+                ACCORE::intr(ACCORE::INTRN_ATA);
+            }
+            return word;
+        }
+        break;
     case ATA_C_PACKET:
-    break;
+        if (ACATAPI::has_pio_data())
+            return ACATAPI::pio_read_word();
+        break;
     
     default:
         Console.Error("ACATA: reading from %X while no pending CMD", ACATA_R_DATA);
@@ -127,6 +214,7 @@ u16 ACATA::handle_dataR(u32 addr) { // PIO read at R_DATA
 }
 
 void ACATA::handle_cmd(u16 val) {
+    CLRB(R_STATUS, ATA_STAT_DRQ);
     switch (val) {
     case ATA_C_NOP:
         ACATA::cmd_handled = val;
@@ -139,26 +227,181 @@ void ACATA::handle_cmd(u16 val) {
         ACATA::cmd_handledc = 0;
         R_STATUS |= ATA_STAT_DRQ;
     break;
-    case ATA_C_IDENTIFY_DEVICE:
-        Console.Warning("ATA_C_IDENTIFY_DEVICE");
-        ACATA::cmd_handled = val;
-        ACATA::cmd_handledc = 0;
-        R_STATUS |= ATA_STAT_DRQ;
-    break;
     case ATA_C_PACKET:
         ACATA::cmd_handled = val;
         ACATA::cmd_handledc = 0;
-        if (!ACATA_ISDMA) Console.Error("ATA_C_PACKET: over PIO recieved");
+        R_NSECTOR = 0x01; // ATAPI: Command/Data=1, IO=0 -> ready for command packet
         R_STATUS |= ATA_STAT_DRQ;
         CLRB(R_STATUS, ATA_STAT_BUSY);
+        CLRB(R_STATUS, ATA_STAT_ERR);
         CLRB(R_STATUS_ALT, ATA_STAT_ERR); // when packet is sent, ACCDVD fails if this bit is set or timeout consumed
+        ACCORE::intr(ACCORE::INTRN_ATA);
     break;
+    case ATA_C_IDENTIFY_DEVICE:
+        Console.Warning("ATA_C_IDENTIFY_DEVICE");
+        ata_build_identify();
+        ACATA::cmd_handled = val;
+        ACATA::cmd_handledc = 0;
+        R_STATUS |= ATA_STAT_DRQ;
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        ACCORE::intr(ACCORE::INTRN_ATA);
+    break;
+    case ATA_C_READ_SECTOR: {
+        u32 lba = R_SECTOR | (R_LCYL << 8) | (R_HCYL << 16) | ((R_SELECT & 0x0F) << 24);
+        u32 count = R_NSECTOR ? R_NSECTOR : 256;
+        u32 total = count * 512;
+        if (!ACATA::TH::IMAGE || total > sizeof(ata_pio_buf)) {
+            R_STATUS |= ATA_STAT_ERR;
+            R_ERROR = ATA_ERR_ABORT;
+            ACCORE::intr(ACCORE::INTRN_ATA);
+            break;
+        }
+        fseeko(ACATA::TH::IMAGE, (off_t)lba * 512, SEEK_SET);
+        size_t rd = fread(ata_pio_buf, 1, total, ACATA::TH::IMAGE);
+        if (rd != total) {
+            Console.Error("ATA_C_READ_SECTOR: short read (%zu/%u) at LBA %u", rd, total, lba);
+            R_STATUS |= ATA_STAT_ERR;
+            R_ERROR = ATA_ERR_ABORT;
+            ACCORE::intr(ACCORE::INTRN_ATA);
+            break;
+        }
+        ACATA::cmd_handled = val;
+        ACATA::cmd_handledc = 0;
+        ata_pio_len = total;
+        ata_pio_pos = 0;
+        R_STATUS |= ATA_STAT_DRQ;
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        CLRB(R_STATUS, ATA_STAT_ERR);
+        ACCORE::intr(ACCORE::INTRN_ATA);
+        break;
+    }
+    case ATA_C_READ_DMA:
+    case ATA_C_READ_DMA_WITHOUT_RETRIES: {
+        u32 lba = R_SECTOR | (R_LCYL << 8) | (R_HCYL << 16) | ((R_SELECT & 0x0F) << 24);
+        u32 count = R_NSECTOR ? R_NSECTOR : 256;
+        ACATA::TH::LBA = lba;
+        ACATA::TH::nsector = count;
+        ACATA::TH::sectorsize = 512;
+        ACCORE::DMA::PendTrasnfType = ACCORE::DMA::ATA;
+        ACATA::cmd_handled = val;
+        R_STATUS |= ATA_STAT_BUSY;
+        CLRB(R_STATUS, ATA_STAT_DRQ);
+        break;
+    }
     case ATA_C_SET_FEATURES:
         Console.Warning("ATA_C_SET_FEATURES: FEATURE:%04X, R_NSECTOR:%04X, R_SECTOR:%04X, R_LCYL:%04X, R_HCYL:%04X",
             R_FEATURE, R_NSECTOR, R_SECTOR, R_LCYL, R_HCYL);
+        CLRB(R_STATUS, ATA_STAT_ERR);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
     break;
-    
-    
+    case ATA_C_WRITE_DMA:
+    case ATA_C_WRITE_DMA_WITHOUT_RETRIES: {
+        u32 lba = R_SECTOR | (R_LCYL << 8) | (R_HCYL << 16) | ((R_SELECT & 0x0F) << 24);
+        u32 count = R_NSECTOR ? R_NSECTOR : 256;
+        ACATA::TH::LBA = lba;
+        ACATA::TH::nsector = count;
+        ACATA::TH::sectorsize = 512;
+        ACCORE::DMA::PendTrasnfType = ACCORE::DMA::ATA_WRITE;
+        ACATA::cmd_handled = val;
+        R_STATUS |= ATA_STAT_BUSY;
+        CLRB(R_STATUS, ATA_STAT_DRQ);
+        break;
+    }
+    case ATA_C_SMART:
+        CLRB(R_STATUS, ATA_STAT_ERR);
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
+        break;
+    case ATA_C_IDLE:
+    case ATA_C_IDLE_IMMEDIATE:
+    case ATA_C_STANDBY:
+    case ATA_C_STANDBY_IMMEDIATE:
+    case ATA_C_SLEEP:
+    case ATA_C_CHECK_POWER_MODE:
+        R_NSECTOR = 0xFF;
+        CLRB(R_STATUS, ATA_STAT_ERR);
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
+        break;
+    case ATA_C_SCE_SECURITY_CONTROL:
+        if (R_FEATURE == 0xEC) {
+            memset(ata_pio_buf, 0, 512);
+            ata_pio_len = 512;
+            ata_pio_pos = 0;
+            ACATA::cmd_handled = val;
+            ACATA::cmd_handledc = 0;
+            R_STATUS |= ATA_STAT_DRQ;
+            CLRB(R_STATUS, ATA_STAT_BUSY);
+            CLRB(R_STATUS, ATA_STAT_ERR);
+            ACCORE::intr(ACCORE::INTRN_ATA);
+        } else {
+            CLRB(R_STATUS, ATA_STAT_ERR);
+            CLRB(R_STATUS, ATA_STAT_BUSY);
+            R_STATUS |= ATA_STAT_READY;
+            ACCORE::intr(ACCORE::INTRN_ATA);
+        }
+        break;
+    case ATA_C_READ_NATIVE_MAX_ADDRESS: {
+        u32 max_lba = ata_total_sectors ? ata_total_sectors - 1 : 0;
+        R_SECTOR = max_lba & 0xFF;
+        R_LCYL = (max_lba >> 8) & 0xFF;
+        R_HCYL = (max_lba >> 16) & 0xFF;
+        R_SELECT = (R_SELECT & 0xF0) | ((max_lba >> 24) & 0x0F);
+        CLRB(R_STATUS, ATA_STAT_ERR);
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
+        break;
+    }
+    case ATA_C_SET_MAX_ADDRESS:
+        CLRB(R_STATUS, ATA_STAT_ERR);
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
+        break;
+    case ATA_C_SECURITY_SET_PASSWORD:
+    case ATA_C_SECURITY_UNLOCK:
+    case ATA_C_SECURITY_ERASE_PREPARE:
+    case ATA_C_SECURITY_ERASE_UNIT:
+    case ATA_C_SECURITY_FREEZE_LOCK:
+    case ATA_C_SECURITY_DISABLE_PASSWORD:
+        CLRB(R_STATUS, ATA_STAT_ERR);
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
+        break;
+    case ATA_C_FLUSH_CACHE:
+    case ATA_C_FLUSH_CACHE_EXT:
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
+    break;
+    case ATA_C_EXECUTE_DEVICE_DIAGNOSTIC:
+        R_ERROR = 0x01;
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
+    break;
+    case ATA_C_INITIALIZE_DEVICE_PARAMETERS:
+        CLRB(R_STATUS, ATA_STAT_ERR);
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        ACCORE::intr(ACCORE::INTRN_ATA);
+        break;
+    case ATA_C_DEVICE_RESET:
+        R_ERROR = 0x01;
+        R_NSECTOR = 0x01;
+        R_SECTOR = 0x01;
+        R_LCYL = 0x00;
+        R_HCYL = 0x00;
+        R_SELECT = 0x00;
+        CLRB(R_STATUS, ATA_STAT_BUSY);
+        R_STATUS |= ATA_STAT_READY;
+        break;
+
     default:
         Console.Error("unhandled ATACMD %X", val);
         break;

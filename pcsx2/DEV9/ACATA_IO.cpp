@@ -97,8 +97,28 @@ void ACATA::TH::IO_Read() {
 	}
 }
 
+void ACATA::TH::IO_Write(u32* addr, u32 size) {
+	const s64 lba = ACATA::TH::LBA;
+	const u64 pos = lba * ACATA::TH::sectorsize;
+	u64 size2 = (u64)sectorsize * nsector;
+	if (size != size2)
+		Console.Error("ACATA::TH::IO_Write> mismatch %ld vs %ld", size, size2);
+	if (FileSystem::FSeek64(IMAGE, pos, SEEK_SET) != 0) {
+		Console.ErrorFmt("ACATA:IO_Write: failed to seek pos:{}", pos);
+		return;
+	}
+	if (std::fwrite(addr, sectorsize, nsector, IMAGE) != static_cast<size_t>(nsector)) {
+		Console.ErrorFmt("ACATA:IO_Write: size:{} at:{} failed", size2, pos);
+		return;
+	}
+	std::fflush(IMAGE);
+}
+
 int ACATA::TH::IO_OpenImage() {
-    ACATA::TH::IMAGE = std::fopen(ACATA::imgpath.c_str(), "rb");
+    ACATA::TH::IMAGE = std::fopen(ACATA::imgpath.c_str(), "r+b");
+	if (!ACATA::TH::IMAGE) {
+		ACATA::TH::IMAGE = std::fopen(ACATA::imgpath.c_str(), "rb");
+	}
 	if (!ACATA::TH::IMAGE) {
 		Console.ErrorFmt("{}> fail to fopen '{}' w/ error {} '{}'", __FUNCTION__, ACATA::imgpath, errno, strerror(errno));
 		return errno;
