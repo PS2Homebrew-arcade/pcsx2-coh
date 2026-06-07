@@ -179,6 +179,9 @@
          <layout class="QVBoxLayout" name="extraLayout">
           <item>
            <widget class="QCheckBox" name="suppressDaemon">
+            <property name="toolTip">
+             <string>Avoids dongle I/O errors by suppresing the DAEMON driver security dongle check routine</string>
+            </property>
             <property name="text">
              <string>Suppress DAEMON security thread</string>
             </property>
