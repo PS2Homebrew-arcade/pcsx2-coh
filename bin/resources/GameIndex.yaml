@@ -57,7 +57,7 @@ NM00013:
 NM00014:
   name: Dragon Chronicle - Legendary Master Ark
   region: System246
-  bootprog: ???
+  bootprog: DGNLOAD
 NM00015:
   name: Battle Gear 3 Tuned
   region: System246
@@ -69,7 +69,7 @@ NM00016:
 NM00017:
   name: Mobile Suit Gundam Zeta - A.E.U.G. vs. Titans DX
   region: System246
-  bootprog: ???
+  bootprog: GDXLOAD
 NM00018:
   name: Capcom Fighting Jam
   region: System246
@@ -81,7 +81,7 @@ NM00019:
 NM00020:
   name: Dragon Chronicle Online - Great Sky Battle
   region: System246
-  bootprog: ???
+  bootprog: DCOLOAD
 NM00021:
   name: Cobra - The Arcade
   region: System256
@@ -97,11 +97,11 @@ NM00023:
 NM00024:
   name: Mobile Suit Gundam SEED - Federation vs. Z.A.F.T.
   region: System246
-  bootprog: ???
+  bootprog: SEDLOAD
 NM00025:
   name: Zoids Infinity - EX
   region: System246
-  bootprog: ???
+  bootprog: ZOILOAD
 NM00026:
   name: Tekken 5 - Dark Resurrection
   region: System256
@@ -113,7 +113,7 @@ NM00027:
 NM00028:
   name: Druaga Online - The Story of Aon
   region: System256
-  bootprog: ???
+  bootprog: DRULOAD
 NM00029:
   name: Kinnikuman Muscle Grand Prix
   region: System256
@@ -121,7 +121,7 @@ NM00029:
 NM00030:
   name: Mobile Suit Gundam Quiz Warrior
   region: System246
-  bootprog: ???
+  bootprog: GQZLOAD
 NM00031:
   name: Soul Calibur III - Arcade Edition
   region: System246
@@ -137,19 +137,19 @@ NM00033:
 NM00034:
   name: Mobile Suit Gundam SEED Destiny - Federation vs. Z.A.F.T. II
   region: System256
-  bootprog: ???
+  bootprog: SE2LOAD
 NM00035:
   name: The Battle of YuYu Hakusho - Deathmatch! Dark Martial Arts Association
   region: System256
-  bootprog: ???
+  bootprog: YUULOAD
 NM00036:
   name: Whole Brain Training With Everybody
   region: System256
-  bootprog: ???
+  bootprog: NTRLOAD
 NM00037:
   name: Quiz & Variety Suku Suku Inufuku 2 - More Suku Suku
   region: System256
-  bootprog: ???
+  bootprog: DR2LOAD
 NM00038:
   name: Taiko Drum Master 9
   region: System256
@@ -161,7 +161,7 @@ NM00039:
 NM00040:
   name: Kinnikuman Muscle Grand Prix 2
   region: System256
-  bootprog: ???
+  bootprog: KI2LOAD
 NM00041:
   name: Taiko Drum Master 10
   region: System256
@@ -178,10 +178,14 @@ NM00044:
   name: Taiko Drum Master 11
   region: System256
   bootprog: T11LOAD
+NM00045:
+  name: Taiko Drum Master 11 Asian Edition Taiwan
+  region: System256
+  bootprog: TEALOAD
 NM00046:
   name: Taiko Drum Master 11 - Asian Edition
   region: System256
-  bootprog: ???
+  bootprog: TEBLOAD
 NM00047:
   name: Ace Driver 3 - Final Turn
   region: System256
@@ -198,10 +202,14 @@ NM00052:
   name: Mobile Suit Gundam - Gundam vs. Gundam NEXT
   region: System256
   bootprog: GNXLOAD
+NM00053:
+  name: Taiko Drum Master 12 - Asian Edition Taiwan
+  region: System256
+  bootprog: TECLOAD
 NM00054:
   name: Taiko Drum Master 12 - Asian Edition
   region: System256
-  bootprog: ???
+  bootprog: TEDLOAD
 NM00056:
   name: Taiko Drum Master 13
   region: System256
