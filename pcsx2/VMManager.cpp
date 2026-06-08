@@ -732,6 +732,14 @@ void VMManager::WarnAboutUnconfiguredController()
 
 void VMManager::ApplyGameFixes()
 {
+	// Arcade games: HasBootedELF() stays false during proverb.elf boot, but the
+	// game serial is already set. Apply GameDB fixes early so gsHWFixes work.
+	if (!s_acgame.empty())
+	{
+		if (const auto* game = GameDatabase::findGame(ACJV::GetGameId()))
+			game->applyGSHardwareFixes(EmuConfig.GS);
+	}
+
 	if (!HasBootedELF() && !GSDumpReplayer::IsReplayingDump())
 	{
 		// Instant DMA needs to be on for this BIOS (font rendering is broken without it, possible cache issues).

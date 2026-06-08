@@ -30,6 +30,8 @@ NM00007:
   name: Soul Calibur II
   region: System246
   bootprog: SCSLOAD
+  gsHWFixes:
+    alignSprite: 1
 NM00008:
   name: Wangan Midnight
   region: System246
@@ -106,6 +108,8 @@ NM00026:
   name: Tekken 5 - Dark Resurrection
   region: System256
   bootprog: T55LOAD
+  gsHWFixes:
+    alignSprite: 1
 NM00027:
   name: Super Dragon Ball Z
   region: System256
@@ -126,6 +130,8 @@ NM00031:
   name: Soul Calibur III - Arcade Edition
   region: System246
   bootprog: SC3LOAD
+  gsHWFixes:
+    alignSprite: 1
 NM00032:
   name: Time Crisis 4
   region: System256

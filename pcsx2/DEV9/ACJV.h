@@ -111,6 +111,7 @@ namespace ACJV {
     void SetMode(JVS_MODE mode);
     void SetScreenPos(u16 x, u16 y);
     void SetGameId(const std::string& gameid);
+    const std::string& GetGameId();
     const GunMapping& GetGunMapping();
 }
 
