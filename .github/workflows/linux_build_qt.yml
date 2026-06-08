@@ -27,10 +27,6 @@ on:
         required: false
         type: boolean
         default: false
-      detail:
-        required: false
-        type: string
-        default: ""
       patchesUrl:
         required: false
         type: string
@@ -43,6 +39,10 @@ on:
         required: false
         type: boolean
         default: false
+      cmakeBuildType:
+        required: false
+        type: string
+        default: Release
 
 jobs:
   build_linux:
@@ -95,8 +95,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .ccache
-          key: ${{ inputs.os }} ${{ inputs.platform }} ${{ inputs.compiler }} ${{ inputs.detail }} ccache ${{ steps.ccache_cache_timestamp.outputs.timestamp }}
-          restore-keys: ${{ inputs.os }} ${{ inputs.platform }} ${{ inputs.compiler }} ${{ inputs.detail }} ccache
+          key: ${{ inputs.os }} ${{ inputs.platform }} ${{ inputs.compiler }} ccache ${{ steps.ccache_cache_timestamp.outputs.timestamp }}
+          restore-keys: ${{ inputs.os }} ${{ inputs.platform }} ${{ inputs.compiler }} ccache
 
       - name: Install Packages
         run: |
@@ -133,7 +133,7 @@ jobs:
           ADDITIONAL_CMAKE_ARGS: ${{ inputs.cmakeflags }}
         run: |
           cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE="${{ inputs.cmakeBuildType }}" \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
             -DCMAKE_PREFIX_PATH="$HOME/deps" \
             -DCMAKE_C_COMPILER=clang-17 \

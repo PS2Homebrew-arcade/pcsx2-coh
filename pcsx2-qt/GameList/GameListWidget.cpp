@@ -294,11 +294,6 @@ void GameListWidget::initialize()
 	if (Host::ContainsBaseSettingValue("GameListTableView", "HeaderState"))
 	{
 		loadTableHeaderState();
-		// Enforce at least one column is visible immediately after loading.
-		// This handles cases where a config (perhaps from an older version) has 0 columns and
-		// no games are visible to be changed (such as per-game config) or played as you can't click on any.
-		// Will automatically repair a broken header state from config (PCSX2.ini) file.
-		ensureMinimumOneColumnVisible();
 	}
 	else
 	{
@@ -576,8 +571,11 @@ void GameListWidget::onListViewContextMenuRequested(const QPoint& point)
 
 void GameListWidget::onTableViewHeaderContextMenuRequested(const QPoint& point)
 {
-	QHeaderView* const header = m_table_view->horizontalHeader();
-	QMenu menu(this);
+	QHeaderView* header = m_table_view->horizontalHeader();
+
+	QMenu* menu = new QMenu(this);
+	menu->setAttribute(Qt::WA_DeleteOnClose);
+
 	// Iterate through all available columns defined in the model.
 	for (int column = 0; column < GameListModel::Column_Count; column++)
 	{
@@ -586,7 +584,7 @@ void GameListWidget::onTableViewHeaderContextMenuRequested(const QPoint& point)
 			continue;
 		// Create a checkable menu item for each column title.
 		const QString title = m_model->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString();
-		QAction* const action = menu.addAction(title);
+		QAction* const action = menu->addAction(title);
 		action->setCheckable(true);
 		action->setChecked(!header->isSectionHidden(column));
 		// Update the GUI when the user toggles a column with left-click actions in the right-click menu on the column.
@@ -599,12 +597,14 @@ void GameListWidget::onTableViewHeaderContextMenuRequested(const QPoint& point)
 		});
 	}
 
-	menu.addSeparator();
+	menu->addSeparator();
+
 	// Add a "panic button" that fully restores the default column layout.
 	// This allows users to recover without editing configuration files such as [GameListTableView] has a key with
 	// and variable HeaderState which you can remove the line to also do the same effect but old method is not user-friendly.
-	menu.addAction(tr("Reset All Columns"), this, &GameListWidget::resetTableHeaderToDefault);
-	menu.exec(m_table_view->viewport()->mapToGlobal(point));
+	menu->addAction(tr("Reset All Columns"), this, &GameListWidget::resetTableHeaderToDefault);
+
+	menu->popup(header->mapToGlobal(point));
 }
 
 void GameListWidget::onCoverScaleChanged()
@@ -806,6 +806,14 @@ void GameListWidget::loadTableHeaderState()
 
 	QSignalBlocker blocker(header);
 	header->restoreState(QByteArray::fromBase64(QByteArray::fromStdString(state_setting)));
+
+	header->setSectionHidden(GameListModel::Column_Cover, true);
+
+	// Enforce at least one column is visible immediately after loading.
+	// This handles cases where a config (perhaps from an older version) has 0 columns and
+	// no games are visible to be changed (such as per-game config) or played as you can't click on any.
+	// Will automatically repair a broken header state from config (PCSX2.ini) file.
+	ensureMinimumOneColumnVisible();
 }
 
 void GameListWidget::ensureMinimumOneColumnVisible()

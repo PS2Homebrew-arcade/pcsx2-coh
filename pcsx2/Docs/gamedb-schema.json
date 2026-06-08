@@ -173,6 +173,11 @@
               "minimum": 0,
               "maximum": 2
             },
+            "limit24BitDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
             "alignSprite": {
               "type": "integer",
               "minimum": 0,
@@ -203,6 +208,11 @@
               "minimum": 0,
               "maximum": 1
             },
+			"drawBuffering": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
             "PCRTCOffsets": {
               "type": "integer",
               "minimum": 0,
@@ -217,6 +227,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 2
+            },
+            "accurateAlphaTest": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
             },
             "trilinearFiltering": {
               "type": "integer",

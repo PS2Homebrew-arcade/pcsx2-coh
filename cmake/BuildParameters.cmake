@@ -84,7 +84,7 @@ if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64" OR "${CMAKE_HOST_SYSTEM_PR
 	option(DISABLE_ADVANCE_SIMD "Disable advance use of SIMD (SSE2+ & AVX)" OFF)
 
 	list(APPEND PCSX2_DEFS _M_X86=1)
-	set(_M_X86 TRUE)
+	set(ARCH_X86 TRUE)
 	if(DISABLE_ADVANCE_SIMD)
 		message(STATUS "Building for x86-64 (Multi-ISA).")
 	else()
@@ -113,9 +113,14 @@ if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64" OR "${CMAKE_HOST_SYSTEM_PR
 elseif("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "arm64" OR "${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "aarch64" OR
        "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64")
 	message(STATUS "Building for Apple Silicon (ARM64).")
-	list(APPEND PCSX2_DEFS _M_ARM64=1)
-	set(_M_ARM64 TRUE)
-	add_compile_options("-march=armv8.4-a" "-mcpu=apple-m1")
+	set(ARCH_ARM64 TRUE)
+	if(APPLE)
+		# Min spec is an M1
+		add_compile_options("-march=armv8.4-a" "-mcpu=apple-m1")
+	else()
+		# Require atomic rmw instructions
+		add_compile_options("-march=armv8.1-a")
+	endif()
 
 	# If we're running on Linux, we need to detect the page/cache line size.
 	# It could be a virtual machine with 4K pages, or 16K with Asahi.
@@ -242,6 +247,9 @@ if (MSVC)
 else()
 	set(DEFAULT_WARNINGS -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -Wno-missing-field-initializers)
 endif()
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	list(APPEND DEFAULT_WARNINGS -Wno-attributes)
+endif()
 
 if (USE_PGO_GENERATE OR USE_PGO_OPTIMIZE)
 	add_compile_options("-fprofile-dir=${CMAKE_SOURCE_DIR}/profile")
@@ -292,8 +300,8 @@ else()
 	if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
 		message(WARNING
 			"The CMAKE_INTERPROCEDURAL_OPTIMIZATION option is enabled but the "
-			"CMAKE_POSITION_INDEPENDENT_CODE option is disabled. This has been "
-			"found to result in broken builds on certain platforms.")
+			"POSITION_INDEPENDENT_CODE option is disabled. This has been found "
+			"to result in broken builds on certain platforms.")
 	endif()
 
 	set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
