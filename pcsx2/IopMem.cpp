@@ -119,6 +119,20 @@ u8 iopMemRead8(u32 mem)
 		}
 	} else if (t == ACSRAM_RANGE) {
 		return ACSRAM::Read16(mem);
+	// Arcade HW 8-bit dispatch: IOP firmware does byte reads on 16-bit MMIO.
+	// Without this, byte reads to ACRAM/ATA/JVS/ACCORE returned 0.
+	} else if ((t & 0xFF00) == ACRAM_RANGE) {
+		u16 val16 = ACRAM::Read16(mem & ~1);
+		return (mem & 1) ? (u8)(val16 >> 8) : (u8)val16;
+	} else if ((t & 0xFF00) == ACATA_RANGE) {
+		u16 val16 = ACATA::read16(mem & ~1);
+		return (mem & 1) ? (u8)(val16 >> 8) : (u8)val16;
+	} else if (t == ACJV_RANGE) {
+		u16 val16 = ACJV::Read16(mem & ~1);
+		return (mem & 1) ? (u8)(val16 >> 8) : (u8)val16;
+	} else if (t == 0x1241) {
+		u16 val16 = ACCORE::Read16(mem & ~1);
+		return (mem & 1) ? (u8)(val16 >> 8) : (u8)val16;
 	} else if (t == 0x1f40) {
 		return psxHw4Read8(mem);
 	}
@@ -304,7 +318,28 @@ void iopMemWrite8(u32 mem, u8 value)
 	else if (t == 0x1f40)
 	{
 		psxHw4Write8(mem, value);
-	
+	}
+	else if ((t & 0xFF00) == ACRAM_RANGE)
+	{
+		u16 cur = ACRAM::Read16(mem & ~1);
+		if (mem & 1) cur = (cur & 0x00FF) | ((u16)value << 8);
+		else         cur = (cur & 0xFF00) | value;
+		ACRAM::Write16(mem & ~1, cur);
+	}
+	else if ((t & 0xFF00) == ACATA_RANGE)
+	{
+		u16 cur = ACATA::read16(mem & ~1);
+		if (mem & 1) cur = (cur & 0x00FF) | ((u16)value << 8);
+		else         cur = (cur & 0xFF00) | value;
+		ACATA::write16(mem & ~1, cur);
+	}
+	else if (t == ACJV_RANGE)
+	{
+		if (ACJV::enabled) ACJV::Write16(mem & ~1, value);
+	}
+	else if (t == 0x1241)
+	{
+		ACCORE::Write16(mem & ~1, value);
 	}
 	else
 	{

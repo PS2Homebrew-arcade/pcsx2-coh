@@ -12,6 +12,11 @@
 ACRAM::BankState ACRAM::banks[ACRAM_NUM_BANKS] = {};
 
 u16 ACRAM::Read16(u32 addr) {
+    u32 offset = addr - ACRAM_ADDR_BASE;
+    u32 reg = offset & ACRAM_REG_MASK;
+    // FPGA status registers: TK5DR polls reg 0x00-0x1F during boot, expecting 0x50 (ready).
+    if (reg < 0x20)
+        return 0x50;
     u32 off = GET_RAM_OFF(addr);
     if (off < ACRAM_MAX_SIZE)
         return iopMem->ACRAM[off];

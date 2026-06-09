@@ -1213,9 +1213,9 @@ namespace R3000A
 			LoadFuncs(a0);
 
 			const std::string modname = iopMemReadString(a0 + 12);
+			const u32 version = iopMemRead32(a0 + 8);
 			if (modname == "thbase")
 			{
-				const u32 version = iopMemRead32(a0 + 8);
 				CurrentBiosInformation.iopThreadListAddr = GetThreadList(a0, version);
 			}
 
@@ -1242,11 +1242,14 @@ namespace R3000A
 
 		int CreateThread_HLE()
 		{
+			u32 priority = iopMemRead32(a0 + 16);
 			if (ACJV::IsSuppressDaemonEnabled())
 			{
-				u32 priority = iopMemRead32(a0 + 16);
 				if (priority >= 126)
+				{
+					Console.WriteLn("IOP: SUPPRESSING thread (pri=%d >= 126)", priority);
 					s_suppress_next_start = true;
+				}
 			}
 			return 0;
 		}
@@ -1305,7 +1308,7 @@ namespace R3000A
 	{
 		void sceSifRegisterRpc_DEBUG()
 		{
-			DevCon.WriteLn(Color_Gray, "sifcmd sceSifRegisterRpc: rpc_id %x", a1);
+			DevCon.WriteLn(Color_Gray, "IOP: sceSifRegisterRpc server_id=%08X", a1);
 		}
 	} // namespace sifcmd
 

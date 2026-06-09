@@ -80,6 +80,8 @@ NM00019:
   name: Tekken 5
   region: System256
   bootprog: TK5LOAD
+  gsHWFixes:
+    alignSprite: 1
 NM00020:
   name: Dragon Chronicle Online - Great Sky Battle
   region: System246

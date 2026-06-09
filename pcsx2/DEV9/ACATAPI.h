@@ -36,6 +36,7 @@ namespace ACATAPI
     bool has_pio_data();
     void pio_write_word(u16 val);
     bool has_pio_write();
+    bool dma_read(u32* pMem, int size);
 
     enum CONSTANTS {
         DVD_SECTORSIZE = 0x800,

@@ -17,6 +17,12 @@ static u32 atapi_pio_pos = 0;
 static u8 atapi_pio_write_buf[65536];
 static u32 atapi_pio_write_len = 0;
 static u32 atapi_pio_write_pos = 0;
+
+// Instant DMA buffer: read sectors into memory immediately instead of deferring to
+// the DMA callback. Avoids a race where SPU2 DMA completes before disc data is ready.
+static u8 atapi_dma_buf[2048 * 128];
+static u32 atapi_dma_len = 0;
+
 static u8 mode_page_01[12] = {};
 static bool mode_page_01_set = false;
 
@@ -51,6 +57,20 @@ static void atapi_complete_nodata() {
     ACATA::R_NSECTOR = 0x03;
     CLRB(ACATA::R_STATUS, ATA_STAT_DRQ);
     CLRB(ACATA::R_STATUS, ATA_STAT_ERR);
+    CLRB(ACATA::R_STATUS, ATA_STAT_BUSY);
+    ACATA::R_STATUS |= ATA_STAT_READY;
+    ACATA::R_LCYL = 0;
+    ACATA::R_HCYL = 0;
+    ACCORE::intr(ACCORE::INTRN_ATA);
+}
+
+// Signal command error: clears transfer state and sets R_NSECTOR=0x03 (I/O=1, C/D=1)
+// to indicate the device is ready for a new command after an error.
+static void atapi_complete_error() {
+    atapi_pio_len = 0;
+    atapi_pio_pos = 0;
+    ACATA::R_NSECTOR = 0x03;
+    CLRB(ACATA::R_STATUS, ATA_STAT_DRQ);
     CLRB(ACATA::R_STATUS, ATA_STAT_BUSY);
     ACATA::R_STATUS |= ATA_STAT_READY;
     ACATA::R_LCYL = 0;
@@ -100,6 +120,15 @@ void ACATAPI::pio_write_word(u16 val) {
 
 bool ACATAPI::has_pio_write() {
     return atapi_pio_write_len > 0 && atapi_pio_write_pos * 2 < atapi_pio_write_len;
+}
+
+bool ACATAPI::dma_read(u32* pMem, int size) {
+    if (atapi_dma_len == 0)
+        return false;
+    u32 copy = std::min(atapi_dma_len, (u32)size);
+    memcpy(pMem, atapi_dma_buf, copy);
+    atapi_dma_len = 0;
+    return true;
 }
 
 void ACATAPI::handle_cmd(atapi_packet_t P) {
@@ -177,21 +206,34 @@ void ACATAPI::handle_cmd(atapi_packet_t P) {
             break;
         }
         if (ACATA_ISDMA) {
-            ACATA::TH::LBA = transf_lba;
-            ACATA::TH::nsector = nsec;
-            ACATA::TH::sectorsize = ACATAPI::CONSTANTS::DVD_SECTORSIZE;
-            ACCORE::DMA::PendTrasnfType = ACCORE::DMA::ATAPI;
-            ACATA::R_NSECTOR = 0x02;
-            CLRB(ACATA::R_STATUS, ATA_STAT_DRQ);
-            CLRB(ACATA::R_STATUS, ATA_STAT_ERR);
-            ACCORE::intr(ACCORE::INTRN_ATA);
+            u32 total = nsec * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
+            bool ok = false;
+            if (total <= sizeof(atapi_dma_buf)) {
+                if (ACATA::TH::isCHD) {
+                    u32 scale = ACATAPI::CONSTANTS::DVD_SECTORSIZE / CHD.GetSectorSize();
+                    ok = CHD.ReadSectors((u64)transf_lba * scale, nsec * scale, atapi_dma_buf);
+                } else {
+                    s64 offset = (s64)transf_lba * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
+                    FileSystem::FSeek64(ACATA::TH::IMAGE, offset, SEEK_SET);
+                    ok = (fread(atapi_dma_buf, 1, total, ACATA::TH::IMAGE) == total);
+                }
+            }
+            if (ok) {
+                atapi_dma_len = total;
+                atapi_complete_nodata();
+            } else {
+                Console.Error("ACATAPI:READ_10 DMA: read failed lba %u, %u sectors", transf_lba, nsec);
+                ACATA::R_STATUS |= ATA_STAT_ERR;
+                ACATA::R_ERROR = ATA_ERR_ABORT;
+                atapi_complete_error();
+            }
         } else {
             u32 total = nsec * ACATAPI::CONSTANTS::DVD_SECTORSIZE;
             if (total > sizeof(atapi_pio_buf)) {
                 Console.Error("ACATAPI:READ_10: transfer too large (%u bytes)", total);
                 ACATA::R_STATUS |= ATA_STAT_ERR;
                 ACATA::R_ERROR = ATA_ERR_ABORT;
-                atapi_complete_nodata();
+                atapi_complete_error();
                 break;
             }
             bool ok = false;
@@ -209,7 +251,7 @@ void ACATAPI::handle_cmd(atapi_packet_t P) {
                 Console.Error("ACATAPI:READ_10: read failed at lba %u, %u sectors", transf_lba, nsec);
                 ACATA::R_STATUS |= ATA_STAT_ERR;
                 ACATA::R_ERROR = ATA_ERR_ABORT;
-                atapi_complete_nodata();
+                atapi_complete_error();
             }
         }
         break;
