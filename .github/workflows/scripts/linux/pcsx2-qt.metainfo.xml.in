@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Uses the AppStream standard https://www.freedesktop.org/software/appstream/docs/chap-Metadata.html -->
 <component type="desktop">
-  <id>net.pcsx2.PCSX2</id>
-  <launchable type="desktop-id">net.pcsx2.PCSX2.desktop</launchable>
+  <id>io.github.PS2Homebrew_arcade.PCSX2x6</id>
+  <launchable type="desktop-id">io.github.PS2Homebrew_arcade.PCSX2x6.desktop</launchable>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0+</project_license>
   <name>PCSX2</name>
-  <developer id="net.pcsx2">
+  <developer id="io.github.PS2Homebrew_arcade">
     <name>PCSX2 Team</name>
   </developer>
   <summary>PlayStation 2 emulator</summary>
@@ -15,9 +15,8 @@
     <p>PlayStation 2 and PS2 are registered trademarks of Sony Interactive Entertainment. This application is not affiliated in any way with Sony Interactive Entertainment.</p>
   </description>
   <url type="homepage">https://pcsx2.net/</url>
-  <url type="vcs-browser">https://github.com/PCSX2/pcsx2</url>
-  <url type="bugtracker">https://github.com/PCSX2/pcsx2/issues</url>
-  <url type="donation">https://github.com/sponsors/PCSX2</url>
+  <url type="vcs-browser">https://github.com/PS2Homebrew-arcade/pcsx2x6</url>
+  <url type="bugtracker">https://github.com/PS2Homebrew-arcade/pcsx2x6/issues</url>
   <url type="faq">https://pcsx2.net/docs/</url>
   <url type="help">https://pcsx2.net/discord</url>
   <url type="contribute">https://pcsx2.net/docs/category/contributing</url>
@@ -26,7 +25,7 @@
   <screenshots>
     <screenshot type="default">
       <image>
-        https://raw.githubusercontent.com/PCSX2/pcsx2/master/.github/workflows/scripts/linux/flatpak/screenshots/screenshot1.png
+        https://raw.githubusercontent.com/PS2Homebrew-arcade/pcsx2x6/master/.github/workflows/scripts/linux/flatpak/screenshots/screenshot1.png
       </image>
       <caption>
         The main PCSX2 Qt interface
@@ -34,7 +33,7 @@
     </screenshot>
     <screenshot>
       <image>
-        https://raw.githubusercontent.com/PCSX2/pcsx2/master/.github/workflows/scripts/linux/flatpak/screenshots/screenshot2.png
+        https://raw.githubusercontent.com/PS2Homebrew-arcade/pcsx2x6/master/.github/workflows/scripts/linux/flatpak/screenshots/screenshot2.png
       </image>
       <caption>
         PCSX2 running a game
@@ -67,6 +66,6 @@
     <release version="@GIT_VERSION@" date="@GIT_DATE@" />
   </releases>
   <custom>
-    <value key="flathub::manifest">https://raw.githubusercontent.com/PCSX2/pcsx2/@GIT_HASH@/.github/workflows/scripts/linux/flatpak/net.PS2Homebrew-arcade.PCSX2x6.json</value>
+    <value key="flathub::manifest">https://raw.githubusercontent.com/PS2Homebrew-arcade/pcsx2x6/@GIT_HASH@/.github/workflows/scripts/linux/flatpak/io.github.PS2Homebrew_arcade.PCSX2x6.json</value>
   </custom>
 </component>
